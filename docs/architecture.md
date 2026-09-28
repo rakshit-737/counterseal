@@ -1,6 +1,6 @@
 # Counterseal architecture
 
-**Date:** 2026-09-28  
+**Date:** 2026-09-28
 **Status:** Phase 0 architecture; Phase 1 core is the active implementation
 boundary.
 

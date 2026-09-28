@@ -1,6 +1,6 @@
 # Initial related-work review
 
-**Retrieved:** 2026-09-28  
+**Retrieved:** 2026-09-28
 **Method:** concise reading of primary project/specification documentation using
 the project web fetch tool. This is a design input, not a survey, benchmark, or
 claim of priority.

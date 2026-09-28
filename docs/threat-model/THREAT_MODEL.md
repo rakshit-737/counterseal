@@ -1,7 +1,7 @@
 # Counterseal threat model
 
-**Status:** `in_progress` research baseline  
-**Date:** 2026-09-28  
+**Status:** `in_progress` research baseline
+**Date:** 2026-09-28
 **Scope:** Phase 0 architecture and Phase 1 core control plane, plus the
 explicitly bounded future V1 local-kind/RBAC validation path.
 
