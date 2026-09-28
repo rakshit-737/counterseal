@@ -194,5 +194,6 @@ No test, integration, benchmark, screenshot, security review, or production
 assurance result is claimed here. Actual verification belongs in
 [`docs/STATUS.md`](docs/STATUS.md).
 
-The Apache-2.0 `LICENSE` file is a maintainer-owned release task. Do not infer
-licensing terms from `NOTICE` while that file is absent.
+The repository includes the Apache-2.0 `LICENSE` and a `NOTICE` attribution
+file. Dependency and third-party asset licensing still requires review before
+redistribution or a formal release.
