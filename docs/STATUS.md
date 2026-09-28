@@ -70,7 +70,8 @@ safety, database availability, workload preservation, or Kubernetes behavior.
 ## Current blockers and limitations
 
 1. The live Compose/PostgreSQL path requires Docker and generated local secrets;
-   it has not yet been independently re-run as the lead checkpoint.
+   it was verified once on this Windows host, but repeatability across hosts
+   and operating systems remains unverified.
 2. No Kubernetes client, audit collector, RBAC analyzer, deterministic
    candidate engine, real rehearsal, evidence bundle, approval consumer, or
    local applier exists.
