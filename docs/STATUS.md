@@ -59,6 +59,7 @@ observations about this codebase only:
 | Windows `python scripts/bootstrap.py` | Passed; built images, migrated PostgreSQL, created ignored local secrets, and started services |
 | Live HTTP/PostgreSQL/worker smoke | Passed: `/healthz` 200, `/readyz` 200, analyst `/v1/me`, case create, unsupported job enqueue, worker timeline completion |
 | `uv run --locked --extra test pip-audit --skip-editable` | Passed; no known vulnerabilities reported; local editable package skipped |
+| GitHub Actions CI for `d42dd57` | **Passed**: Python quality/tests, web quality/tests, and dependency audit; runner emitted only action-runtime/Ubuntu migration warnings |
 | kind/RBAC integration | Not run; no Counterseal collector or engine exists |
 | Benchmark/evaluation | Not run |
 | Independent security audit | Not performed |
