@@ -1,0 +1,171 @@
+name: counterseal
+
+x-backend-build: &backend-build
+  context: .
+  dockerfile: infra/backend.Dockerfile
+
+x-backend-security: &backend-security
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  mem_limit: 512m
+  cpus: "1.0"
+  pids_limit: 256
+
+x-backend-environment: &backend-environment
+  COUNTERSEAL_DATABASE_URL: ${COUNTERSEAL_DATABASE_URL:?Run python scripts/bootstrap.py first}
+  COUNTERSEAL_ENVIRONMENT: ${COUNTERSEAL_ENVIRONMENT:-development}
+  COUNTERSEAL_TOKEN_HASH_SECRET: ${COUNTERSEAL_TOKEN_HASH_SECRET:?Run python scripts/bootstrap.py first}
+  COUNTERSEAL_LOG_LEVEL: ${COUNTERSEAL_LOG_LEVEL:-INFO}
+
+services:
+  db:
+    image: docker.io/library/postgres:17-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-counterseal}
+      POSTGRES_USER: ${POSTGRES_USER:-counterseal}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - type: bind
+        source: ${COUNTERSEAL_DB_PASSWORD_FILE:-.local/db_password}
+        target: /run/secrets/db_password
+        read_only: true
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /run/postgresql:rw,noexec,nosuid,size=16m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    mem_limit: 768m
+    cpus: "1.0"
+    pids_limit: 256
+    restart: unless-stopped
+    networks:
+      - backend
+
+  migration:
+    image: counterseal/backend:local
+    build: *backend-build
+    environment: *backend-environment
+    command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    <<: *backend-security
+    restart: "no"
+    networks:
+      - backend
+
+  api:
+    image: counterseal/backend:local
+    build: *backend-build
+    environment:
+      <<: *backend-environment
+      COUNTERSEAL_HOST: 0.0.0.0
+      COUNTERSEAL_PORT: 8000
+    command: ["uvicorn", "counterseal.backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    <<: *backend-security
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backend
+
+  worker:
+    image: counterseal/backend:local
+    build: *backend-build
+    # POSIX bind mounts retain host ownership. Bootstrap sets this to the
+    # invoking non-root UID/GID so a mode-0600 worker token stays private.
+    user: "${COUNTERSEAL_WORKER_UID:-10001}:${COUNTERSEAL_WORKER_GID:-10001}"
+    environment:
+      <<: *backend-environment
+      COUNTERSEAL_WORKER_TOKEN_FILE: /run/secrets/worker_token
+      COUNTERSEAL_WORKER_EXPECTED_SUBJECT: ${COUNTERSEAL_WORKER_EXPECTED_SUBJECT:-local-workflow-worker}
+      COUNTERSEAL_WORKER_POLL_SECONDS: ${COUNTERSEAL_WORKER_POLL_SECONDS:-2}
+      COUNTERSEAL_WORKER_ERROR_BACKOFF_SECONDS: ${COUNTERSEAL_WORKER_ERROR_BACKOFF_SECONDS:-5}
+      COUNTERSEAL_WORKER_LEASE_SECONDS: ${COUNTERSEAL_WORKER_LEASE_SECONDS:-60}
+      COUNTERSEAL_WORKER_MAX_CONSECUTIVE_ERRORS: ${COUNTERSEAL_WORKER_MAX_CONSECUTIVE_ERRORS:-5}
+    command: ["python", "-m", "counterseal.backend.worker"]
+    volumes:
+      - type: bind
+        source: ${COUNTERSEAL_WORKER_TOKEN_FILE:-.local/worker.token}
+        target: /run/secrets/worker_token
+        read_only: true
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    <<: *backend-security
+    healthcheck:
+      test: ["CMD", "python", "-c", "from pathlib import Path; import sys,time; p=Path('/tmp/counterseal-worker.ready'); sys.exit(0 if p.is_file() and time.time()-p.stat().st_mtime < 30 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: "no"
+    networks:
+      - backend
+
+  frontend:
+    image: counterseal/frontend:local
+    build:
+      context: .
+      dockerfile: infra/frontend.Dockerfile
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    mem_limit: 128m
+    cpus: "0.50"
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--output-document=-", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - backend
+      - edge
+
+volumes:
+  postgres-data:
+
+networks:
+  backend:
+    internal: true
+  edge:

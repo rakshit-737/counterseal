@@ -1,0 +1,9 @@
+# Optional host publication for disposable integration tests. The base stack
+# keeps PostgreSQL on the internal Compose network only.
+services:
+  db:
+    ports:
+      - "127.0.0.1:15432:5432"
+    networks:
+      - backend
+      - edge
