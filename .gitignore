@@ -1,0 +1,41 @@
+# Credentials and local operational data
+.env
+.env.*
+!.env.example
+.local/
+.secrets/
+*.pem
+*.key
+*.kubeconfig
+*.db
+*.sqlite*
+*.log
+artifacts/
+# Private agent state
+.omnirush/
+.opencode/
+graphify-out/
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.hypothesis/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.coverage*
+htmlcov/
+# Frontend and generated outputs
+node_modules/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
