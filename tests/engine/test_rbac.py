@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from counterseal.domain import ClaimPredicate, TypedClaim
+from counterseal.domain import ClaimPredicate, TypedClaim, canonical_digest
 from counterseal.engine.rbac import (
     AnalysisStatus,
     ApiSuccessFact,
@@ -526,6 +526,23 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
     binding = snapshot.role_bindings[0]
     role_object_digest = "sha256:" + "1" * 64
     binding_object_digest = "sha256:" + "2" * 64
+    audit_object_digest = canonical_digest(
+        {"audit_id": "audit-1", "snapshot_id": snapshot.snapshot_id, "response_code": 200}
+    )
+    probe_object_digest = canonical_digest(
+        {"probe_id": "probe-1", "snapshot_id": snapshot.snapshot_id, "response_code": 403}
+    )
+    result_object_digest = canonical_digest(
+        {
+            "contract_id": "contract-1",
+            "result_id": "result-1",
+            "snapshot_id": snapshot.snapshot_id,
+            "passed": True,
+        }
+    )
+    scope_object_digest = canonical_digest(
+        {"snapshot_id": snapshot.snapshot_id, "scope_id": "scope-1", "complete": True}
+    )
     object_record = SnapshotObjectRecord(
         object_id="role-object",
         kind="Role",
@@ -551,7 +568,7 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
         kind="AuditMetadata",
         name="audit-1",
         namespace=None,
-        object_digest="sha256:" + "3" * 64,
+        object_digest=audit_object_digest,
         snapshot_id=snapshot.snapshot_id,
         evidence_ids=("evidence-1",),
         source_id="source-1",
@@ -561,7 +578,7 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
         kind="ProbeResult",
         name="probe-1",
         namespace=None,
-        object_digest="sha256:" + "4" * 64,
+        object_digest=probe_object_digest,
         snapshot_id=snapshot.snapshot_id,
         evidence_ids=("evidence-1",),
         source_id="source-1",
@@ -571,7 +588,7 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
         kind="BusinessInvariantResult",
         name="result-1",
         namespace=None,
-        object_digest="sha256:" + "5" * 64,
+        object_digest=result_object_digest,
         snapshot_id=snapshot.snapshot_id,
         evidence_ids=("evidence-1",),
         source_id="source-1",
@@ -581,7 +598,7 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
         kind="SnapshotScope",
         name="scope-1",
         namespace=None,
-        object_digest="sha256:" + "6" * 64,
+        object_digest=scope_object_digest,
         snapshot_id=snapshot.snapshot_id,
         evidence_ids=("evidence-1",),
         source_id="source-1",
@@ -613,7 +630,7 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
                 ("evidence-1",),
                 "source-1",
                 "audit-object",
-                audit_object.object_digest,
+                audit_object_digest,
             ),
         ),
         binding_references=(
@@ -646,7 +663,7 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
                 ("evidence-1",),
                 "source-1",
                 "probe-object",
-                probe_object.object_digest,
+                probe_object_digest,
             ),
         ),
         business_invariants=(
@@ -658,7 +675,7 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
                 ("evidence-1",),
                 "source-1",
                 "result-object",
-                result_object.object_digest,
+                result_object_digest,
             ),
         ),
         snapshot_scopes=(
@@ -669,7 +686,7 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
                 ("evidence-1",),
                 "source-1",
                 "scope-object",
-                scope_object.object_digest,
+                scope_object_digest,
             ),
         ),
         source_objects=(
@@ -735,6 +752,8 @@ def test_typed_claim_verifier_uses_facts_and_rejects_fabricated_evidence() -> No
         object_digest=role_object_digest,
     )
     assert not verify_claim(claims[0], replace(context, api_success=(wrong_object_api,))).verified
+    changed_api = replace(context.api_success[0], response_code=201)
+    assert not verify_claim(claims[0], replace(context, api_success=(changed_api,))).verified
     unscoped_context = replace(
         context,
         snapshot=replace(context.snapshot, scope_id=None),

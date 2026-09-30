@@ -16,11 +16,13 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from hashlib import sha256
 from itertools import chain, islice
 from typing import Any, Final, cast
+
+from pydantic import ValidationError
 
 from counterseal.domain import (
     ClaimPredicate,
@@ -29,6 +31,7 @@ from counterseal.domain import (
     GraphNode,
     GraphNodeType,
     TypedClaim,
+    canonical_digest,
 )
 
 MAX_ITEMS: Final = 256
@@ -201,7 +204,6 @@ class ReasonCode(StrEnum):
     CLAIM_FACT_FALSE = "claim_fact_false"
     CLAIM_SOURCE_MISMATCH = "claim_source_mismatch"
     CLAIM_CONTENT_MISMATCH = "claim_content_mismatch"
-    RUNNER_EVIDENCE_UNSUPPORTED = "runner_evidence_unsupported"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1856,6 +1858,14 @@ class ClaimVerification:
     def ok(self) -> bool:
         return self.verified
 
+    @property
+    def verification_scope(self) -> str:
+        return "SUPPLIED_RECORDS_ONLY"
+
+    @property
+    def source_authenticated(self) -> bool:
+        return False
+
     def __bool__(self) -> bool:
         return self.verified
 
@@ -1873,6 +1883,11 @@ class ClaimVerifier:
         self._evidence = {item.evidence_id: item for item in context.evidence}
 
     def verify(self, claim: TypedClaim) -> ClaimVerification:
+        if isinstance(claim, TypedClaim):
+            try:
+                claim = TypedClaim.model_validate(claim)
+            except (ValidationError, TypeError, ValueError):
+                claim = None  # type: ignore[assignment]
         if not isinstance(claim, TypedClaim):
             return ClaimVerification(
                 claim_id="invalid-claim",
@@ -2002,8 +2017,10 @@ class ClaimVerifier:
             verified = fact is not None and self._source_object_exists(fact, snapshot_id)
         if fact is None:
             reasons.append(ReasonCode.CLAIM_FACT_MISSING)
-        elif not self._fact_is_authentic(fact, evidence_ids):
+        elif not self._fact_references_match(fact, evidence_ids):
             reasons.append(ReasonCode.CLAIM_EVIDENCE_MISMATCH)
+        elif not self._content_matches(fact):
+            reasons.append(ReasonCode.CLAIM_CONTENT_MISMATCH)
         if not verified:
             reasons.append(ReasonCode.CLAIM_FACT_FALSE)
         return self._result(claim_id, predicate, snapshot_id, verified and not reasons, reasons)
@@ -2122,7 +2139,25 @@ class ClaimVerifier:
             and actual.object_digest == fact.object_digest
         )
 
-    def _fact_is_authentic(self, fact: Any, claim_evidence: Sequence[str]) -> bool:
+    def _content_matches(self, fact: Any) -> bool:
+        """Check that the metadata-object digest covers the typed fact fields."""
+
+        snapshot = self.context.snapshot
+        object_id = getattr(fact, "object_id", None)
+        object_digest = getattr(fact, "object_digest", None)
+        if snapshot is None or object_id is None or object_digest is None:
+            return False
+        if not isinstance(
+            fact,
+            (ApiSuccessFact, ForbiddenProbeFact, BusinessInvariantFact, SnapshotScopeFact),
+        ):
+            return True
+        payload = asdict(fact)
+        for field_name in ("evidence_ids", "source_id", "object_id", "object_digest"):
+            payload.pop(field_name, None)
+        return canonical_digest(payload) == object_digest
+
+    def _fact_references_match(self, fact: Any, claim_evidence: Sequence[str]) -> bool:
         snapshot = self.context.snapshot
         fact_snapshot = getattr(fact, "snapshot_id", None)
         source_id = getattr(fact, "source_id", None)
@@ -2189,7 +2224,7 @@ def _find(records: Iterable[Any], field_name: str, value: str) -> Any | None:
 
 def _fact_evidence_is_claimed(fact: Any, claim_evidence: Sequence[str]) -> bool:
     fact_evidence = tuple(getattr(fact, "evidence_ids", ()))
-    return bool(fact_evidence) and set(fact_evidence).issubset(set(claim_evidence))
+    return bool(fact_evidence) and set(fact_evidence) == set(claim_evidence)
 
 
 def _fact_object_identity(fact: Any) -> tuple[str, str] | None:
