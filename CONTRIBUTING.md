@@ -17,13 +17,13 @@ the [implementation plan](docs/IMPLEMENTATION_PLAN.md), and the
 
 ## Scope rules
 
-- The active work is Phase 0/1: HTTP auth, SQLAlchemy/Alembic persistence,
-  PostgreSQL deployment support, durable unsupported job transport, and React
-  case creation.
+- The active work is the offline portion of Phase 2: HTTP auth and persistence,
+  metadata-only audit normalization, snapshot-scoped RBAC analysis, typed
+  claims, and deterministic Role-only candidate compilation. The control-plane
+  investigation job remains an unsupported transport boundary.
 - SQLite is a test accelerator only; PostgreSQL is the deployment database.
-- The deterministic engine, collector, rehearsal runner, AI assistance,
-  bundles, and human applier belong to later phases and must not be implied by
-  a placeholder.
+- The Kubernetes collector, rehearsal runner, AI assistance, bundles, and
+  human applier belong to later phases and must not be implied by a placeholder.
 - The planned V1 candidate scope is a dedicated namespaced Role: remove secret
   access, remove `list`/`watch`, or restrict a named `get`. Do not change
   bindings, widen permissions, or accept generic manifests.
@@ -34,7 +34,8 @@ the [implementation plan](docs/IMPLEMENTATION_PLAN.md), and the
 - Keep backend code under `src/counterseal/backend` and migrations under
   `alembic`.
 - Preserve API, database, lease, idempotency, and append-only invariants.
-- Use RFC 8785 canonicalization for future evidence-bound engine material.
+- Use RFC 8785 canonicalization for evidence-bound engine material, and do not
+  present its digest as authenticity or authority.
 - Mark planned behavior as planned and unsupported behavior as unsupported.
 - Keep public report status separate from workflow state; display
   `FIXTURE_VALIDATED` with `NOT PRODUCTION ASSURANCE`.

@@ -1,13 +1,13 @@
 # Counterseal status
 
-**Checkpoint:** Phase 1 core control-plane slice
-**Date:** 2026-09-28
+**Checkpoint:** Phase 2 deterministic offline engine slice
+**Date:** 2026-09-30
 **Overall status:** `in_progress`
 
 This is a development checkpoint, not a release, security certification, or
-production-readiness assessment. Counterseal's Kubernetes security engine,
-collector, rehearsal runner, evidence bundle verifier, and local applier are
-not implemented.
+production-readiness assessment. The engine implemented here is offline and
+fixture-driven; the Kubernetes collector, rehearsal runner, evidence bundle
+verifier, approval consumer, and local applier are not implemented.
 
 ## Implemented in this checkpoint
 
@@ -29,6 +29,22 @@ not implemented.
   - idempotent investigation-job enqueueing;
   - worker-only lease claim/heartbeat/complete endpoints;
   - explicit `UNSUPPORTED` / `SECURITY_ENGINE_NOT_IMPLEMENTED` completion.
+- Phase 2 offline engine under `src/counterseal/engine/`:
+  - metadata-only, body-free Kubernetes audit normalization with bounded
+    projection, stage deduplication, deterministic grouping, and contract
+    violation detection;
+  - additive, snapshot-scoped RBAC analysis for core `Secret`/`ConfigMap`
+    read permissions, including direct subjects, Kubernetes ServiceAccount
+    groups, RoleBinding-to-ClusterRole relationships, cross-namespace subject
+    bindings, alternative grants, and evidence-linked graph records;
+  - typed-claim verification bound to the supplied snapshot, source, evidence
+    IDs, and metadata object digests; scalar facts without a source object are
+    rejected;
+  - fail-closed handling for incomplete/unknown snapshots, wildcard and
+    aggregated rules, unsupported subresources, and ambiguous grants;
+  - a closed policy gate and typed compiler for only the three namespaced
+    `Role` narrowing transformations, with deterministic RFC 8785 digests;
+  - a synthetic `CANDIDATE_ONLY` smoke demo at `make phase2-offline`.
 - Phase 1 web shell under `apps/web/`:
   - in-memory token entry (no browser storage);
   - same-origin API client;
@@ -47,10 +63,12 @@ observations about this codebase only:
 | Check | Result |
 | --- | --- |
 | `uv sync --python 3.12 --extra test` | Passed; resolved and installed the locked environment |
-| `uv run --locked --extra test pytest -q` | **73 passed**; 28 non-failing dependency/config deprecation warnings |
-| `uv run --locked --extra test ruff check src tests scripts` | **Passed** after lead quality fixes |
-| `uv run --locked --extra test ruff format --check src tests scripts` | **Passed** after formatting the Python tree |
-| `uv run --locked --extra test mypy` | **Passed**; no issues in 23 source files |
+| `uv run --locked --extra test pytest -q` | **127 passed**; 28 non-failing dependency/config deprecation warnings |
+| `uv run --locked --extra test pytest tests/engine -q` | **54 passed**; offline Phase 2 unit, adversarial, and property coverage |
+| `uv run --locked --extra test ruff check src tests scripts` | **Passed** |
+| `uv run --locked --extra test ruff format --check src tests scripts` | **Passed**; 45 Python files checked |
+| `uv run --locked --extra test mypy` | **Passed**; no issues in 29 source files |
+| `uv run --locked --extra test python scripts/phase2_offline.py` | **Passed**; deterministic A/B/C output, all `CANDIDATE_ONLY` |
 | `npm test -- --run` | **15 passed** across 3 files |
 | `npm run typecheck` | Passed |
 | `npm run build` | Passed; Vite production bundle generated |
@@ -60,7 +78,7 @@ observations about this codebase only:
 | Live HTTP/PostgreSQL/worker smoke | Passed: `/healthz` 200, `/readyz` 200, analyst `/v1/me`, case create, unsupported job enqueue, worker timeline completion |
 | `uv run --locked --extra test pip-audit --skip-editable` | Passed; no known vulnerabilities reported; local editable package skipped |
 | GitHub Actions CI for `d42dd57` | **Passed**: Python quality/tests, web quality/tests, and dependency audit; runner emitted only action-runtime/Ubuntu migration warnings |
-| kind/RBAC integration | Not run; no Counterseal collector or engine exists |
+| kind/RBAC integration | Not run; no collector or rehearsal runner exists; Phase 2 engine remains offline |
 | Benchmark/evaluation | Not run |
 | Independent security audit | Not performed |
 
@@ -72,9 +90,9 @@ safety, database availability, workload preservation, or Kubernetes behavior.
 1. The live Compose/PostgreSQL path requires Docker and generated local secrets;
    it was verified once on this Windows host, but repeatability across hosts
    and operating systems remains unverified.
-2. No Kubernetes client, audit collector, RBAC analyzer, deterministic
-   candidate engine, real rehearsal, evidence bundle, approval consumer, or
-   local applier exists.
+2. No Kubernetes client, audit collector, real rehearsal, evidence bundle,
+   approval consumer, or local applier exists. The Phase 2 RBAC engine accepts
+   only bounded caller-supplied fixtures and does not authenticate their source.
 3. Phase 1's SQLite path is a test accelerator only. PostgreSQL is the
    deployment database and requires a migration run before readiness succeeds.
 4. Token bootstrap is a local-development identity foundation, not an external
@@ -82,15 +100,14 @@ safety, database availability, workload preservation, or Kubernetes behavior.
 5. Audit append-only triggers are database-boundary controls. A privileged
    database owner can bypass or replace the database and remains a trust
    assumption.
-6. No claim of `FIXTURE_VALIDATED` is produced by the current Phase 1 API or
-   UI. That public status is reserved for the later evidence-backed fixture
-   path and must display **NOT PRODUCTION ASSURANCE**.
+6. No claim of `FIXTURE_VALIDATED` is produced by the current API, UI, or
+   offline engine. That public status is reserved for the later
+   evidence-backed fixture path and must display **NOT PRODUCTION ASSURANCE**.
 
 ## Next smallest safe slice
 
-Implement Phase 2's deterministic offline engine against synthetic RBAC
-fixtures: normalize metadata-only audit events, build a snapshot-scoped
-permission graph, verify typed claims, compile only the three allowed
-namespaced-Role narrowing transformations, and emit explicit unsupported or
-inconclusive results when visibility is incomplete. Add tests before any live
-kind or model integration.
+Implement Phase 3's read-only host collector and separate rehearsal runner for
+an explicitly selected, developer-owned local kind fixture. Preserve the
+Phase 2 offline boundary: wrong context, incomplete evidence, unsupported RBAC
+shapes, stale identities, and failed probes must remain explicit abstentions or
+unsupported outcomes. Add no applier or production/remote-cluster path.

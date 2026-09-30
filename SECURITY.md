@@ -9,8 +9,9 @@ control, containment system, autonomous remediator, or authorization service.
 The supported design boundary is an explicitly owned local kind fixture, a
 host-side read-only collector, a separate trusted rehearsal runner, and a
 human local applier for a narrow dedicated namespaced Role diff. The current
-Phase 0/1 implementation has no collector, deterministic security engine,
-rehearsal runner, or applier. Investigation jobs are intentionally
+Phase 0–2 implementation includes only an offline deterministic engine over
+bounded caller-supplied fixtures; it has no collector, rehearsal runner,
+evidence bundle verifier, or applier. Investigation jobs are intentionally
 `UNSUPPORTED` with `SECURITY_ENGINE_NOT_IMPLEMENTED`.
 
 Do not test this project against production, shared, remote, or managed

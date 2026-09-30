@@ -1,8 +1,8 @@
 # Counterseal architecture
 
-**Date:** 2026-09-28
-**Status:** Phase 0 architecture; Phase 1 core is the active implementation
-boundary.
+**Date:** 2026-09-30
+**Status:** Phase 0/1 plus the offline Phase 2 engine are implemented; cluster
+collection and later validation boundaries remain planned.
 
 Counterseal is a research prototype for evidence-bound, fixture-scoped
 Kubernetes RBAC remediation validation. The architecture deliberately keeps
@@ -14,8 +14,9 @@ four responsibilities separate:
 4. a separate trusted host runner rehearses the candidate, after which a human
    may make a local application decision.
 
-The current implementation ends at the first responsibility. Dashed components
-below are planned boundaries, not available integrations.
+The current implementation includes the first responsibility and an offline
+fixture engine. Dashed components below are planned cluster/evidence
+integrations, not available integrations.
 
 ## Current and planned data flow
 
@@ -31,9 +32,11 @@ flowchart LR
     CASES --> JOBS[Durable job transport\nidempotency + leases]
     JOBS --> UNSUP[UNSUPPORTED\nSECURITY_ENGINE_NOT_IMPLEMENTED]
 
+    FIXTURES[Synthetic bounded\nPhase 2 fixtures] --> ENG[Deterministic offline engine]
+    ENG -. candidate-only .-> CAND[Typed CANDIDATE_ONLY diff]
     TARGET[Explicit developer-owned\nlocal kind cluster] -. read-only .-> COL[Host collector]
     COL -. observations .-> EVID[Evidence records\nRFC 8785 bytes + digests]
-    EVID -. input .-> ENG[Deterministic engine]
+    EVID -. future input .-> ENG
     ENG -. candidate diff .-> RUN[Separate trusted host\nrehearsal runner]
     RUN -. verdict .-> REPORT[Report status\nFIXTURE_VALIDATED\nNOT PRODUCTION ASSURANCE]
     REPORT -. human decision .-> APPLY[Human local applier]
@@ -41,8 +44,8 @@ flowchart LR
 
     classDef current fill:#e7f5ed,stroke:#247a4b,color:#123b26;
     classDef planned fill:#f5f1e8,stroke:#9a6b22,color:#4a3512,stroke-dasharray:5 5;
-    class PERSON,UI,API,AUTH,CASES,SQL,MIG,JOBS,UNSUP current;
-    class TARGET,COL,EVID,ENG,RUN,REPORT,APPLY,OUT planned;
+    class PERSON,UI,API,AUTH,CASES,SQL,MIG,JOBS,UNSUP,FIXTURES,ENG,CAND current;
+    class TARGET,COL,EVID,RUN,REPORT,APPLY,OUT planned;
 ```
 
 ## Phase 0/1 control plane
@@ -74,8 +77,8 @@ collected or validated.
 The job table provides durable transport mechanics: request fingerprinting,
 idempotency, claim leases, heartbeats, retries through lease expiry, and a
 terminal unsupported receipt. The investigation job kind is intentionally typed
-even though its engine is absent. A worker must not invent a result. Until the
-deterministic engine exists, completion is:
+but is not wired to the offline library or a future evidence path. A worker
+must not invent a result. Completion remains:
 
 ```text
 status: COMPLETED
@@ -86,7 +89,21 @@ reason: SECURITY_ENGINE_NOT_IMPLEMENTED
 This makes transport useful for integration work without disguising an empty
 engine as security validation.
 
-## Planned V1 validation path
+## Phase 2 offline engine
+
+The current engine is intentionally separate from the HTTP job transport. Its
+modules under `src/counterseal/engine/` accept bounded typed fixtures and
+produce deterministic, source-referenced observations, permission inventories,
+typed-claim verification results, and `CANDIDATE_ONLY` rule deltas. Audit
+normalization discards irrelevant metadata and rejects bodies, credentials,
+and unknown fields. RBAC analysis accounts for additive bindings, including
+cross-namespace ServiceAccount subjects, while unresolved wildcards and
+incomplete visibility remain unsupported or inconclusive.
+
+The engine does not authenticate fixture provenance, contact a Kubernetes API,
+run a rehearsal, or apply a candidate. It cannot produce `FIXTURE_VALIDATED`.
+
+## Planned V1 validation path beyond the offline engine
 
 ### Read-only collection
 
@@ -106,8 +123,9 @@ evidence, and target mismatch produce an abstention or failure.
 
 ### Deterministic candidate scope
 
-The engine will accept only a dedicated namespaced `Role` and a declared
-workload permission question. Its candidate transformations are limited to:
+The offline engine accepts only a dedicated namespaced `Role` fixture and a
+declared bounded permission question. Its candidate transformations are
+limited to:
 
 - removing access to `secrets`;
 - removing `list` and `watch`; and
@@ -121,8 +139,8 @@ declared question cannot be answered from bounded evidence.
 
 ### Rehearsal and local application
 
-The rehearsal runner is a separate trusted host process. It consumes the
-collector's evidence and the engine's candidate, then performs bounded,
+The future rehearsal runner is a separate trusted host process. It will consume
+the collector's evidence and the engine's candidate, then perform bounded,
 read-only baseline/candidate probes against the explicitly owned fixture. It
 does not hold an applier command or silently use the operator's ambient
 context.

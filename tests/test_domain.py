@@ -591,7 +591,7 @@ def test_supported_transforms_are_strictly_narrowing(transform: TransformationTy
     elif transform is TransformationType.REMOVE_SECRET_LIST_WATCH:
         after = RbacRule(verbs=("get",))
     else:
-        after = RbacRule(verbs=before.verbs, resource_names=("named-secret",))
+        after = RbacRule(verbs=("get",), resource_names=("named-secret",))
     operation = PlanOperation(
         operation_id="op", rule_index=0, transformation=transform, before=before, after=after
     )

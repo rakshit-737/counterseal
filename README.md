@@ -15,21 +15,27 @@ human decides whether to apply it locally.
 
 ## Current boundary
 
-The repository is currently limited to **Phase 0 (architecture)** and **Phase 1
-(core control plane)**. The current implementation direction includes:
+The repository currently contains **Phase 0 (architecture)**, **Phase 1 (core
+control plane)**, and the offline portion of **Phase 2 (deterministic engine)**:
 
 - HTTP bearer authentication with hash-only token storage and role checks;
 - a SQLAlchemy persistence layer with Alembic migrations;
 - PostgreSQL as the deployment database, with SQLite retained only as a test
   accelerator;
 - durable, idempotent job transport with leases, heartbeats, and explicit
-  unsupported completion; and
-- a React case-creation surface backed by the case contract.
+  unsupported completion;
+- a React case-creation surface backed by the case contract;
+- metadata-only audit normalization and contract-scoped read observations;
+- snapshot-scoped, additive RBAC permission analysis and typed-claim checks; and
+- a bounded compiler for the three namespaced-`Role` narrowing candidates.
 
-The investigation/security engine is **not implemented**. A queued job is
-transport, not validation: it completes only as `UNSUPPORTED` with
-`SECURITY_ENGINE_NOT_IMPLEMENTED`. Case creation and a status label do not
-create evidence and do not imply that a Kubernetes operation was analyzed.
+The Phase 2 engine is **offline and fixture-driven only**. It accepts bounded
+caller-supplied metadata and typed records; it does not collect evidence,
+connect to Kubernetes, rehearse a change, call a model, or apply a manifest. A
+queued Phase 1 investigation job remains transport, not validation: it
+completes only as `UNSUPPORTED` with `SECURITY_ENGINE_NOT_IMPLEMENTED`.
+Case creation and a status label do not create evidence or imply a Kubernetes
+operation was analyzed.
 
 The current HTTP control-plane contract is intentionally small:
 
@@ -38,7 +44,7 @@ The current HTTP control-plane contract is intentionally small:
 | `GET /v1/me` | Return the authenticated local principal | HTTP bearer token required |
 | `GET /v1/cases` and `GET /v1/cases/{id}` | Read case metadata | No evidence collection |
 | `POST /v1/cases` | Create a case with title and description | Case starts in `NEEDS_EVIDENCE` |
-| `POST /v1/cases/{id}/investigations` | Enqueue a typed investigation job | Always unsupported until the engine exists |
+| `POST /v1/cases/{id}/investigations` | Enqueue a typed investigation job | Always unsupported until the offline engine is connected to an evidence workflow |
 | `/v1/workers/jobs/*` | Claim, heartbeat, and complete a leased job | Transport only; no engine authority |
 | `/healthz`, `/readyz` | Process/database liveness checks | Not a validation result |
 
@@ -96,12 +102,13 @@ collapsed:
 
 Workflow state is stored separately from the report status. In Phase 1 a newly
 created case is `NEEDS_EVIDENCE`; investigation jobs remain transport records
-and are `UNSUPPORTED` until a real engine is implemented.
+and are `UNSUPPORTED` until the offline engine is connected to a future
+evidence workflow.
 
 ## Architecture at this checkpoint
 
-Solid nodes are current Phase 0/1 boundaries. Dashed nodes are planned and do
-not represent available commands or integrations.
+Solid nodes are current Phase 0–2 boundaries. Dashed nodes are planned and do
+not represent available cluster commands or integrations.
 
 ```mermaid
 flowchart LR
@@ -111,33 +118,37 @@ flowchart LR
     Q --> UNSUP[Typed unsupported result\nSECURITY_ENGINE_NOT_IMPLEMENTED]
     UI[React case surface] --> API
 
+    F[Synthetic bounded fixtures] --> X[Deterministic offline engine\nRFC 8785 canonicalization]
+    X --> D[Typed CANDIDATE_ONLY artifact]
     C[Host read-only collector\nexplicit local kind target] -. planned .-> E[Evidence bundle]
-    E -. planned .-> X[Deterministic RBAC engine\nRFC 8785 canonicalization]
-    X -. planned .-> R[Separate trusted host\nrehearsal runner]
+    E -. planned .-> X
+    X -. planned next .-> R[Separate trusted host\nrehearsal runner]
     R -. planned .-> V[Fixture validation report\nFIXTURE_VALIDATED]
     V -. planned .-> H[Human local applier\nexplicit Role-only diff]
     H -. planned .-> O[(Local application receipt/export)]
 
     classDef current fill:#e7f5ed,stroke:#247a4b,color:#123b26;
     classDef planned fill:#f5f1e8,stroke:#9a6b22,color:#4a3512,stroke-dasharray: 5 5;
-    class U,API,DB,Q,UNSUP,UI current;
-    class C,E,X,R,V,H,O planned;
+    class U,API,DB,Q,UNSUP,UI,F,X,D current;
+    class C,E,R,V,H,O planned;
 ```
 
-The planned path is intentionally split: the collector reads, the engine
-derives, the runner rehearses, and a human applier performs any later local
-change. No Phase 0/1 component can cross those boundaries.
+The path is intentionally split: the current engine derives from synthetic
+bounded inputs, the future collector reads, the future runner rehearses, and a
+human applier performs any later local change. No offline engine output is an
+authorization or application instruction.
 
 ## Repository map
 
 ```text
 src/counterseal/
   domain/                  versioned records, status vocabulary, digests
+  engine/                  offline audit, RBAC, claims, policy, and compiler
   backend/                 HTTP auth, FastAPI routes, SQLAlchemy repositories
     db/                    models, sessions, repositories
 apps/web/                  React/Vite case surface
 alembic/                   database migrations (the canonical migration tree)
-tests/                    Python tests for domain and Phase 1 behavior
+tests/                    Python tests for domain, Phase 1, and Phase 2 offline behavior
 docs/
   architecture.md         current/planned boundary map
   IMPLEMENTATION_PLAN.md   Phase 0–10 objectives and gates
@@ -156,8 +167,17 @@ intentionally live under `alembic`. There are no placeholder `apps/api` or
 Use the [local control-plane operator guide](docs/operators/local-control-plane.md)
 for environment setup, migration commands, local token handling, and any
 verified run record. That guide is the authority for setup details. It must not
-describe a working end-to-end validation workflow until the engine and its
-evidence have been implemented and verified.
+describe a working end-to-end cluster validation workflow: the current engine
+is an offline fixture path only.
+
+To run the deterministic synthetic candidate smoke demo:
+
+```text
+make phase2-offline
+```
+
+Its output is `CANDIDATE_ONLY` compilation material, not a rehearsal verdict,
+authorization decision, or production-safety result.
 
 The README does not provide a pretend cluster command. Do not point the current
 code at a production, shared, or remote cluster, and do not treat a successful

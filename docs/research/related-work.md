@@ -95,6 +95,6 @@ Source:
 The primary sources support a layered boundary rather than a generic operator:
 read-only host collection from an explicit local kind fixture, deterministic
 Role-only candidate derivation, a separate trusted rehearsal runner, and a
-human local applier. Current Phase 0/1 code stops before collection and engine
-work; its queue records unsupported work instead of fabricating a validation
-result.
+human local applier. The current offline Phase 2 engine stops before cluster
+collection and rehearsal; its control-plane queue still records unsupported
+work instead of fabricating a validation result.

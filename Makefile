@@ -2,7 +2,7 @@ PYTHON ?= python
 COMPOSE_ENV ?= .local/compose.env
 COMPOSE = docker compose --env-file $(COMPOSE_ENV)
 
-.PHONY: bootstrap dev test security docs-check demo test-kind verify-bundle eval-offline down compose-config
+.PHONY: bootstrap dev test security docs-check phase2-offline demo test-kind verify-bundle eval-offline down compose-config
 
 bootstrap:
 	$(PYTHON) scripts/bootstrap.py
@@ -19,6 +19,9 @@ security:
 
 docs-check:
 	$(PYTHON) -c "from pathlib import Path; import sys; required = ['README.md', 'CLAUDE.md', 'docs/STATUS.md', 'docs/IMPLEMENTATION_PLAN.md', 'docs/threat-model/THREAT_MODEL.md']; missing = [p for p in required if not Path(p).is_file()]; print('Missing documentation: ' + ', '.join(missing)) if missing else None; sys.exit(1 if missing else 0)"
+
+phase2-offline:
+	uv run --locked --extra test python scripts/phase2_offline.py
 
 compose-config:
 	$(COMPOSE) config --quiet

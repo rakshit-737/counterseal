@@ -22,18 +22,22 @@ safety, autonomous remediation, or an authorization replacement.
 
 ## Active phase boundary
 
-The current implementation work stops at Phase 0/Phase 1:
+The current implementation work stops at the offline portion of Phase 2:
 
 - HTTP bearer authentication and role checks;
 - SQLAlchemy persistence and Alembic migrations;
 - PostgreSQL deployment support, with SQLite only as a test accelerator;
 - durable idempotent job transport with leases and explicit unsupported
   completion; and
-- React case creation against the case contract.
+- React case creation against the case contract;
+- metadata-only audit normalization and contract-bound read analysis;
+- snapshot-scoped RBAC graphing and source-bound typed-claim verification; and
+- deterministic, Role-only candidate compilation for synthetic fixtures.
 
-The security engine, host collector, rehearsal runner, evidence bundle path,
-and human local applier are later boundaries. Do not simulate them with a
-status label, a model field, a queued job, or a placeholder command.
+The host collector, real evidence bundle path, rehearsal runner, approval
+consumer, and human local applier are later boundaries. The Phase 2 engine is
+offline only; do not simulate later behavior with a status label, a model
+field, a queued job, or a placeholder command.
 
 ## Design constraints
 
@@ -61,9 +65,9 @@ status label, a model field, a queued job, or a placeholder command.
   `alembic`; do not create parallel `apps/api` or `migrations` layouts.
 - PostgreSQL is the deployment database. SQLite is allowed only for isolated
   test acceleration and must not be described as the deployment path.
-- Database-backed jobs are transport. Until the engine exists, investigation
-  jobs must remain typed `UNSUPPORTED` with
-  `SECURITY_ENGINE_NOT_IMPLEMENTED`.
+- Database-backed jobs are still transport. The Phase 2 library is not wired to
+  the control-plane investigation route, so those jobs must remain typed
+  `UNSUPPORTED` with `SECURITY_ENGINE_NOT_IMPLEMENTED`.
 - Preserve idempotency, lease ownership, expiry, and append-only metadata
   invariants when changing repositories or migrations.
 

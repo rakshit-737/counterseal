@@ -1,8 +1,9 @@
 # Counterseal implementation plan
 
-**Plan status:** Phase 0 and Phase 1 are the active scope for the current
-session. Later phases are planned. This plan is a research roadmap, not a
-production capability statement.
+**Plan status:** Phase 0, Phase 1, and the offline portion of Phase 2 are the
+active implementation scope. Cluster collection and later phases remain
+planned. This plan is a research roadmap, not a production capability
+statement.
 
 Counterseal validates a narrow, evidence-bound question around an explicitly
 owned local kind fixture. It does not provide containment, production safety,
@@ -45,7 +46,7 @@ make no test, benchmark, integration, or production claim without a record.
 **Stop boundary.** No cluster client, engine, rehearsal, AI, applier, or
 production operation is introduced by architecture documentation.
 
-### Phase 1 — Core *(active)*
+### Phase 1 — Core *(implemented)*
 
 **Objective.** Provide the local control-plane foundation: HTTP authentication,
 case persistence, migration discipline, durable job transport, and React case
@@ -68,15 +69,16 @@ return typed `UNSUPPORTED` with `SECURITY_ENGINE_NOT_IMPLEMENTED`.
 verdict, rehearsal result, candidate plan, or application receipt. The engine
 is not implemented in this phase.
 
-### Phase 2 — Deterministic engine
+### Phase 2 — Deterministic engine *(active; offline slice implemented)*
 
 **Objective.** Implement an offline, fixture-driven engine that canonicalizes
 evidence and candidate material with RFC 8785, computes explicit digests, and
 derives only the allowed namespaced-Role transformations.
 
-**Files and surfaces.** Planned `src/counterseal/engine/**` and focused domain
-types under `src/counterseal/domain/**`; deterministic fixture files under
-`tests/fixtures/rbac/**`; engine tests under `tests/engine/**`.
+**Files and surfaces.** Implemented `src/counterseal/engine/**` and focused
+domain types under `src/counterseal/domain/**`; the synthetic offline smoke
+entry point is `scripts/phase2_offline.py` and focused tests live under
+`tests/engine/**`.
 
 **Dependencies.** Phase 1 case/evidence contracts; Kubernetes RBAC semantics;
 RFC 8785; fixture schemas and expected digests.
@@ -85,7 +87,9 @@ RFC 8785; fixture schemas and expected digests.
 bytes, digests, diff ordering, and decision; secret access, list/watch removal,
 and named-get restriction are the only candidate transformations; binding
 changes, widening, generic manifests, unsupported shapes, and ambiguous
-effective grants abstain or fail closed.
+effective grants abstain or fail closed. The current implementation meets
+this acceptance only for bounded caller-supplied offline records; it does not
+authenticate their source or establish cluster behavior.
 
 **Stop boundary.** The engine remains offline. It does not connect to a
 cluster, rehearse a change, call a model, or apply a manifest.
@@ -270,9 +274,11 @@ Every phase must pass these gates before its output is used by a later phase:
 
 ## Current stop point
 
-The current session stops after Phase 1. The control plane may authenticate,
-persist case metadata, create a durable unsupported job, and present case
-creation. It may not claim that an RBAC fixture was collected, that a
-candidate was deterministically evaluated, that a rehearsal passed, or that
-anything was applied. Those claims require the later phases and their recorded
-acceptance evidence.
+The current session stops after the offline Phase 2 slice. The control plane
+may authenticate, persist case metadata, create a durable unsupported job, and
+present case creation. The offline engine may normalize bounded metadata,
+derive a snapshot-scoped permission inventory, verify typed claims against
+supplied source-bound facts, and compile a `CANDIDATE_ONLY` Role diff. It may
+not claim that a cluster was collected, that a rehearsal passed, that a
+workload was preserved, or that anything was applied. Those claims require the
+later phases and their recorded acceptance evidence.

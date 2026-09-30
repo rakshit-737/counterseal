@@ -1,7 +1,7 @@
 # ADR-0001: V1 fixture-scoped Kubernetes RBAC validation
 
-- **Status:** Accepted scope decision; implementation is planned beyond the
-  current Phase 0/1 boundary.
+- **Status:** Accepted scope decision; the offline Phase 2 engine is implemented
+  and the cluster/rehearsal path remains planned.
 - **Date:** 2026-09-28
 - **Decision owners:** Counterseal maintainers
 - **Related phases:** Phase 2 deterministic engine, Phase 3 real rehearsal,

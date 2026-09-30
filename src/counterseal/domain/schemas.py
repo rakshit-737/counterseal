@@ -146,7 +146,7 @@ class RbacSourceScope(DomainModel):
 
 class RbacPermission(DomainModel):
     api_group: Literal[""] = ""
-    resource: Literal["secrets"] = "secrets"
+    resource: Literal["secrets", "configmaps"] = "secrets"
     verb: ReadVerb
     namespace: Namespace
     resource_name: Name | None = None
@@ -180,8 +180,14 @@ class AuditMetadataEvent(DomainModel):
     namespace: Namespace | None = None
     api_group: Name | Literal[""]
     resource: Name
-    response_code: ResponseCode
+    subresource: Name | None = None
+    resource_name: Name | None = Field(
+        default=None, validation_alias=AliasChoices("resource_name", "name")
+    )
+    groups: Items[Identifier] = ()
+    response_code: ResponseCode | None = None
     occurred_at: Timestamp
+    request_received_at: Timestamp | None = None
     level: Literal["Metadata"] = "Metadata"
 
 
@@ -343,14 +349,21 @@ class PlanOperation(DomainModel):
             expected = self.before.model_copy(update={"verbs": remaining}) if remaining else None
             valid = remaining != self.before.verbs and self.after == expected
         else:
-            old_names = set(self.before.resource_names)
-            new_names = set(self.after.resource_names) if self.after else set()
-            valid = bool(
-                self.after
-                and self.after.verbs == self.before.verbs
-                and new_names
-                and (not old_names or new_names < old_names)
-            )
+            before_verbs = set(self.before.verbs)
+            after_verbs = set(self.after.verbs) if self.after else set()
+            if not self.after:
+                # Candidate C may remove a separate list/watch-only rule while
+                # the named-get rule is narrowed in another operation.
+                valid = bool(before_verbs) and before_verbs <= {"list", "watch"}
+            else:
+                old_names = set(self.before.resource_names)
+                new_names = set(self.after.resource_names)
+                valid = bool(
+                    "get" in before_verbs
+                    and after_verbs == {"get"}
+                    and new_names
+                    and (not old_names or new_names < old_names)
+                )
         if not valid:
             raise ValueError(
                 "operation must strictly narrow secret access using the selected transform"
